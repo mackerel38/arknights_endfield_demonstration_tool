@@ -1,1 +1,0 @@
-# arknights_endfield_demonstration_tool

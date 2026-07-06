@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>選剣演武 期待値計算ツール</title>
+  <link rel="stylesheet" href="assets/css/styles.css">
+</head>
+<body>
+  <main>
+    <header>
+      <h1>選剣演武 期待値計算ツール</h1>
+      <p class="lead">現在の盤面から各ボタンを押した場合の、残り挑戦回数を使い切るまでの最大期待報酬を計算します。</p>
+    </header>
+
+    <div class="layout">
+      <section aria-labelledby="input-title">
+        <h2 id="input-title">盤面入力</h2>
+
+        <div class="grid">
+          <label>
+            残り挑戦回数（現在の回数を含む）
+            <input id="attempts" type="number" min="0" step="1" value="3">
+          </label>
+          <label>
+            残り破棄回数
+            <input id="freeDiscards" type="number" min="0" step="1" value="3">
+          </label>
+          <label>
+            残り報酬2倍回数
+            <input id="doubleUses" type="number" min="0" step="1" value="2">
+          </label>
+          <label>
+            現在、報酬2倍がON
+            <span class="check-row">
+              <input id="doubleActive" type="checkbox">
+              ONとして演算開始を評価
+            </span>
+          </label>
+        </div>
+
+        <div class="subsection">
+          <h2>山札の残り枚数</h2>
+          <div class="deck-grid">
+            <label>
+              戦力1
+              <input id="count1" type="number" min="0" step="1" value="0">
+            </label>
+            <label>
+              戦力2
+              <input id="count2" type="number" min="0" step="1" value="0">
+            </label>
+            <label>
+              戦力3
+              <input id="count3" type="number" min="0" step="1" value="0">
+            </label>
+            <label>
+              戦力4
+              <input id="count4" type="number" min="0" step="1" value="0">
+            </label>
+            <label>
+              戦力5
+              <input id="count5" type="number" min="0" step="1" value="0">
+            </label>
+          </div>
+          <p class="hint">ここは、現在の挑戦で既に引いたカードを除いた山札枚数として入力します。</p>
+          <div class="draw-actions" aria-label="引いたカードを反映">
+            <button type="button" class="draw-card" data-power="1">戦力1を引いた</button>
+            <button type="button" class="draw-card" data-power="2">戦力2を引いた</button>
+            <button type="button" class="draw-card" data-power="3">戦力3を引いた</button>
+            <button type="button" class="draw-card" data-power="4">戦力4を引いた</button>
+            <button type="button" class="draw-card" data-power="5">戦力5を引いた</button>
+          </div>
+        </div>
+
+        <div class="subsection">
+          <h2>精密入力: 現在引いたカードの内訳</h2>
+          <div class="deck-grid">
+            <label>
+              引いた戦力1
+              <input id="drawn1" class="drawn-detail" type="number" min="0" step="1" value="0">
+            </label>
+            <label>
+              引いた戦力2
+              <input id="drawn2" class="drawn-detail" type="number" min="0" step="1" value="0">
+            </label>
+            <label>
+              引いた戦力3
+              <input id="drawn3" class="drawn-detail" type="number" min="0" step="1" value="0">
+            </label>
+            <label>
+              引いた戦力4
+              <input id="drawn4" class="drawn-detail" type="number" min="0" step="1" value="0">
+            </label>
+            <label>
+              引いた戦力5
+              <input id="drawn5" class="drawn-detail" type="number" min="0" step="1" value="0">
+            </label>
+          </div>
+        </div>
+
+        <div class="actions">
+          <button id="clear" class="secondary">クリア</button>
+        </div>
+      </section>
+
+      <section aria-labelledby="result-title">
+        <h2 id="result-title">各ボタンの期待値</h2>
+        <div id="status" class="status"></div>
+        <div id="results" class="result-list"></div>
+      </section>
+    </div>
+
+    <section class="complexity" aria-labelledby="complexity-title">
+      <h2 id="complexity-title">計算量</h2>
+      <p>このツールは、動的計画法を用いてできるだけ高速化していますが、結構重いです（；；）改善できる方はご連絡ください！</p>
+    </section>
+
+    <section class="tools" aria-labelledby="tools-title">
+      <h2 id="tools-title">その他のツール</h2>
+      <a href="https://mackerel38.github.io/arknights_endfield_essence_tool/">基質厳選ツール</a>
+    </section>
+  </main>
+
+  <script src="assets/js/app.js" defer></script>
+</body>
+</html>
