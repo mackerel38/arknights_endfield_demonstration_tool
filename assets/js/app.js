@@ -1,6 +1,7 @@
 const REWARDS = [0, 1000, 2000, 4000, 7500, 12000, 20000, 36000, 60000, 100000, 160000];
 const POWER = [1, 2, 3, 4, 5];
 const MAX_DRAW = 5;
+const valueMemo = new Map();
 
 const ids = [
   "attempts", "freeDiscards", "doubleUses",
@@ -81,7 +82,7 @@ function validateInputs(input) {
 }
 
 function makeSolver() {
-  const memo = new Map();
+  const memo = valueMemo;
 
   function keyOf(state) {
     return [
