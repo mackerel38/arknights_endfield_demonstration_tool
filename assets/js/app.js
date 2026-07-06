@@ -2,6 +2,7 @@ const REWARDS = [0, 1000, 2000, 4000, 7500, 12000, 20000, 36000, 60000, 100000, 
 const POWER = [1, 2, 3, 4, 5];
 const MAX_DRAW = 5;
 const valueMemo = new Map();
+let autoCalculateEnabled = true;
 
 const ids = [
   "attempts", "freeDiscards", "doubleUses",
@@ -60,6 +61,25 @@ function nonNegativeInts(values) {
 function formatNumber(value) {
   if (!Number.isFinite(value)) return "-";
   return value.toLocaleString("ja-JP", { maximumFractionDigits: 2 });
+}
+
+function setPendingMessage() {
+  byId("status").innerHTML = `<div class="notice">入力を変更しました。必要なら「計算する」を押してください。</div>`;
+}
+
+function runAutoCalculate() {
+  if (autoCalculateEnabled) {
+    calculate();
+  } else {
+    setPendingMessage();
+  }
+}
+
+function updateAutoCalculateButton() {
+  const button = byId("autoCalculate");
+  button.textContent = autoCalculateEnabled ? "自動計算: ON" : "自動計算: OFF";
+  button.setAttribute("aria-pressed", String(autoCalculateEnabled));
+  button.classList.toggle("is-off", !autoCalculateEnabled);
 }
 
 function validateInputs(input) {
@@ -297,8 +317,20 @@ document.querySelectorAll(".draw-card").forEach(button => {
     }
     countInput.value = currentCount - 1;
     drawnInput.value = readInt(`drawn${power}`, 0) + 1;
-    calculate();
+    runAutoCalculate();
   });
+});
+
+byId("calculate").addEventListener("click", calculate);
+
+byId("autoCalculate").addEventListener("click", () => {
+  autoCalculateEnabled = !autoCalculateEnabled;
+  updateAutoCalculateButton();
+  if (autoCalculateEnabled) {
+    calculate();
+  } else {
+    setPendingMessage();
+  }
 });
 
 byId("clear").addEventListener("click", () => {
@@ -306,11 +338,12 @@ byId("clear").addEventListener("click", () => {
     byId(id).value = "";
   });
   byId("doubleActive").checked = false;
-  calculate();
+  runAutoCalculate();
 });
 
 document.querySelectorAll("input").forEach(input => {
-  input.addEventListener("change", calculate);
+  input.addEventListener("change", runAutoCalculate);
 });
 
+updateAutoCalculateButton();
 calculate();
