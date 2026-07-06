@@ -9,118 +9,127 @@
 <body>
   <main>
     <header>
-      <h1>選剣演武 期待値計算ツール</h1>
-      <p class="lead">現在の盤面から各ボタンを押した場合の、残り挑戦回数を使い切るまでの最大期待報酬を計算します。</p>
+      <p id="translationWarning" class="translation-warning" data-i18n="translationWarning" hidden></p>
+      <div class="header-row">
+        <div>
+          <h1 data-i18n="pageTitle">選剣演武 期待値計算ツール</h1>
+          <p class="lead" data-i18n="lead">現在の盤面から各ボタンを押した場合の、残り挑戦回数を使い切るまでの最大期待報酬を計算します。</p>
+        </div>
+        <div class="language-switch" aria-label="表示言語">
+          <button type="button" class="secondary" data-lang="ja">日本語</button>
+          <button type="button" class="secondary" data-lang="en">English</button>
+        </div>
+      </div>
     </header>
 
     <div class="layout">
       <section aria-labelledby="input-title">
-        <h2 id="input-title">盤面入力</h2>
+        <h2 id="input-title" data-i18n="inputTitle">盤面入力</h2>
 
         <div class="grid">
           <label>
-            残り挑戦回数（現在の回数を含む）
+            <span data-i18n="attempts">残り挑戦回数（現在の回数を含む）</span>
             <input id="attempts" type="number" min="0" step="1" value="3">
           </label>
           <label>
-            残り破棄回数
+            <span data-i18n="freeDiscards">残り破棄回数</span>
             <input id="freeDiscards" type="number" min="0" step="1" value="3">
           </label>
           <label>
-            残り報酬2倍回数
+            <span data-i18n="doubleUses">残り報酬2倍回数</span>
             <input id="doubleUses" type="number" min="0" step="1" value="2">
           </label>
           <label>
-            現在、報酬2倍がON
+            <span data-i18n="doubleActive">現在、報酬2倍がON</span>
             <span class="check-row">
               <input id="doubleActive" type="checkbox">
-              ONとして演算開始を評価
+              <span data-i18n="doubleActiveHint">ONとして演算開始を評価</span>
             </span>
           </label>
         </div>
 
         <div class="subsection">
-          <h2>山札の残り枚数</h2>
+          <h2 data-i18n="deckCounts">山札の残り枚数</h2>
           <div class="deck-grid">
             <label>
-              戦力1
+              <span data-i18n="power1">戦力1</span>
               <input id="count1" type="number" min="0" step="1" value="0">
             </label>
             <label>
-              戦力2
+              <span data-i18n="power2">戦力2</span>
               <input id="count2" type="number" min="0" step="1" value="0">
             </label>
             <label>
-              戦力3
+              <span data-i18n="power3">戦力3</span>
               <input id="count3" type="number" min="0" step="1" value="0">
             </label>
             <label>
-              戦力4
+              <span data-i18n="power4">戦力4</span>
               <input id="count4" type="number" min="0" step="1" value="0">
             </label>
             <label>
-              戦力5
+              <span data-i18n="power5">戦力5</span>
               <input id="count5" type="number" min="0" step="1" value="0">
             </label>
           </div>
-          <p class="hint">ここは、現在の挑戦で既に引いたカードを除いた山札枚数として入力します。</p>
+          <p class="hint" data-i18n="deckHint">ここは、現在の挑戦で既に引いたカードを除いた山札枚数として入力します。</p>
           <div class="draw-actions" aria-label="引いたカードを反映">
-            <button type="button" class="draw-card" data-power="1">戦力1を引いた</button>
-            <button type="button" class="draw-card" data-power="2">戦力2を引いた</button>
-            <button type="button" class="draw-card" data-power="3">戦力3を引いた</button>
-            <button type="button" class="draw-card" data-power="4">戦力4を引いた</button>
-            <button type="button" class="draw-card" data-power="5">戦力5を引いた</button>
+            <button type="button" class="draw-card" data-power="1"></button>
+            <button type="button" class="draw-card" data-power="2"></button>
+            <button type="button" class="draw-card" data-power="3"></button>
+            <button type="button" class="draw-card" data-power="4"></button>
+            <button type="button" class="draw-card" data-power="5"></button>
           </div>
         </div>
 
         <div class="subsection">
-          <h2>精密入力: 現在引いたカードの内訳</h2>
+          <h2 data-i18n="drawnBreakdown">精密入力: 現在引いたカードの内訳</h2>
           <div class="deck-grid">
             <label>
-              引いた戦力1
+              <span data-i18n="drawnPower1">引いた戦力1</span>
               <input id="drawn1" class="drawn-detail" type="number" min="0" step="1" value="0">
             </label>
             <label>
-              引いた戦力2
+              <span data-i18n="drawnPower2">引いた戦力2</span>
               <input id="drawn2" class="drawn-detail" type="number" min="0" step="1" value="0">
             </label>
             <label>
-              引いた戦力3
+              <span data-i18n="drawnPower3">引いた戦力3</span>
               <input id="drawn3" class="drawn-detail" type="number" min="0" step="1" value="0">
             </label>
             <label>
-              引いた戦力4
+              <span data-i18n="drawnPower4">引いた戦力4</span>
               <input id="drawn4" class="drawn-detail" type="number" min="0" step="1" value="0">
             </label>
             <label>
-              引いた戦力5
+              <span data-i18n="drawnPower5">引いた戦力5</span>
               <input id="drawn5" class="drawn-detail" type="number" min="0" step="1" value="0">
             </label>
           </div>
         </div>
 
         <div class="actions">
-          <button id="calculate" type="button">計算する</button>
+          <button id="calculate" type="button" data-i18n="calculate">計算する</button>
           <button id="autoCalculate" type="button" class="secondary" aria-pressed="true">自動計算: ON</button>
-          <button id="clear" class="secondary">クリア</button>
+          <button id="clear" class="secondary" data-i18n="clear">クリア</button>
         </div>
       </section>
 
       <section aria-labelledby="result-title">
-        <h2 id="result-title">各ボタンの期待値</h2>
+        <h2 id="result-title" data-i18n="resultTitle">各ボタンの期待値</h2>
         <div id="status" class="status"></div>
         <div id="results" class="result-list"></div>
       </section>
     </div>
 
     <section class="complexity" aria-labelledby="complexity-title">
-      <h2 id="complexity-title">計算量</h2>
-      <p>このツールは、動的計画法を用いてできるだけ高速化していますが、結構重いです（；；）改善できる方はご連絡ください！</p>
+      <h2 id="complexity-title" data-i18n="complexityTitle">計算量</h2>
+      <p data-i18n="complexityText">このツールは、動的計画法を用いてできるだけ高速化していますが、結構重いです（；；）改善できる方はご連絡ください！</p>
     </section>
 
     <section class="tools" aria-labelledby="tools-title">
-      <h2 id="tools-title">その他のツール</h2>
-      <a href="https://mackerel38.github.io/arknights_endfield_essence_tool/">基質厳選ツール</a>
+      <h2 id="tools-title" data-i18n="otherTools">その他のツール</h2>
+      <a href="https://mackerel38.github.io/arknights_endfield_essence_tool/" data-i18n="essenceTool">基質厳選ツール</a>
     </section>
   </main>
 

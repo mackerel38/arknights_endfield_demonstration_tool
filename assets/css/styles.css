@@ -44,6 +44,32 @@ header {
   padding-bottom: 18px;
 }
 
+.header-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: start;
+}
+
+.language-switch {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.translation-warning {
+  width: fit-content;
+  max-width: 100%;
+  border: 1px solid rgba(255, 216, 74, 0.42);
+  border-radius: 6px;
+  background: rgba(255, 216, 74, 0.09);
+  color: var(--yellow);
+  padding: 6px 10px;
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
 h1 {
   margin: 0;
   color: var(--yellow);
@@ -184,6 +210,11 @@ button.secondary {
   color: var(--yellow);
 }
 
+button.is-active {
+  border-color: var(--yellow);
+  background: rgba(255, 216, 74, 0.18);
+}
+
 button.is-off {
   border-color: var(--danger);
   color: #ffd0d0;
@@ -307,14 +338,22 @@ button:hover {
     padding-top: 18px;
   }
 
-  .layout,
-  .grid {
-    grid-template-columns: 1fr;
-  }
+      .layout,
+      .grid {
+        grid-template-columns: 1fr;
+      }
 
-  .deck-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
+      .header-row {
+        display: grid;
+      }
+
+      .language-switch {
+        justify-content: flex-start;
+      }
+
+      .deck-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
 
   .draw-actions {
     grid-template-columns: repeat(2, minmax(0, 1fr));
