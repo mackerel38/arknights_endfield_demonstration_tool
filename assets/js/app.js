@@ -1,6 +1,9 @@
 const REWARDS = [0, 1000, 2000, 4000, 7500, 12000, 20000, 36000, 60000, 100000, 160000];
 const POWER = [1, 2, 3, 4, 5];
 const MAX_DRAW = 5;
+const KEY_FIELD_BITS = 16n;
+const KEY_FIELD_BASE = 1n << KEY_FIELD_BITS;
+const MAX_KEY_FIELD_VALUE = Number(KEY_FIELD_BASE - 1n);
 const valueMemo = new Map();
 let autoCalculateEnabled = true;
 
@@ -58,6 +61,14 @@ function nonNegativeInts(values) {
   return values.every(v => Number.isInteger(v) && v >= 0);
 }
 
+function packableInts(values) {
+  return values.every(v => Number.isInteger(v) && v >= 0 && v <= MAX_KEY_FIELD_VALUE);
+}
+
+function appendKeyField(key, value) {
+  return key * KEY_FIELD_BASE + BigInt(value);
+}
+
 function formatNumber(value) {
   if (!Number.isFinite(value)) return "-";
   return value.toLocaleString("ja-JP", { maximumFractionDigits: 2 });
@@ -65,6 +76,17 @@ function formatNumber(value) {
 
 function setPendingMessage() {
   byId("status").innerHTML = `<div class="notice">入力を変更しました。必要なら「計算する」を押してください。</div>`;
+}
+
+function engineLabel(values) {
+  if (values && values.engine === "wasm") return "C++/WebAssembly";
+  if (window.SolverWasm) {
+    const status = window.SolverWasm.getStatus();
+    if (status === "loading") return "JavaScript（WASM読込中）";
+    if (status === "failed") return "JavaScript（WASM読込失敗）";
+    if (status === "not-started") return "JavaScript（WASM未読込）";
+  }
+  return "JavaScript";
 }
 
 function runAutoCalculate() {
@@ -92,6 +114,12 @@ function validateInputs(input) {
   if (!nonNegativeInts([input.attempts, input.freeDiscards, input.doubleUses])) {
     errors.push("回数は0以上の整数で入力してください。");
   }
+  if (!packableInts([input.attempts, input.freeDiscards, input.doubleUses, ...input.currentCounts])) {
+    errors.push(`回数と山札の枚数は${MAX_KEY_FIELD_VALUE}以下で入力してください。`);
+  }
+  if (!input.currentCounts.every((count, i) => count + input.drawnDetail[i] <= MAX_KEY_FIELD_VALUE)) {
+    errors.push(`挑戦開始時の山札枚数は各戦力${MAX_KEY_FIELD_VALUE}枚以下にしてください。`);
+  }
   if (!nonNegativeInts(input.currentCounts)) errors.push("山札の残り枚数は0以上の整数で入力してください。");
   if (input.drawnCount > MAX_DRAW) errors.push("現在引いている枚数は5枚以下です。");
   if (input.doubleActive && input.doubleUses <= 0) {
@@ -105,15 +133,19 @@ function makeSolver() {
   const memo = valueMemo;
 
   function keyOf(state) {
-    return [
-      state.attempts,
-      state.freeDiscards,
-      state.doubleUses,
-      state.doubleActive ? 1 : 0,
-      state.total,
-      state.drawn.join(","),
-      state.base.join(",")
-    ].join("|");
+    let key = 0n;
+    key = appendKeyField(key, state.attempts);
+    key = appendKeyField(key, state.freeDiscards);
+    key = appendKeyField(key, state.doubleUses);
+    key = key * 2n + (state.doubleActive ? 1n : 0n);
+    key = appendKeyField(key, state.total);
+    for (const count of state.drawn) {
+      key = appendKeyField(key, count);
+    }
+    for (const count of state.base) {
+      key = appendKeyField(key, count);
+    }
+    return key;
   }
 
   function currentDeck(state) {
@@ -243,17 +275,25 @@ function calculate() {
   }
 
   const actionKeys = ["draw", "discard", "double", "settle"];
-  const solver = makeSolver();
-  const initialState = {
-    attempts: input.attempts,
-    freeDiscards: input.freeDiscards,
-    doubleUses: input.doubleUses,
-    doubleActive: input.doubleActive,
-    base: addVec(input.currentCounts, input.drawnDetail),
-    drawn: input.drawnDetail,
-    total: input.currentTotal
-  };
-  const values = solver.actionValues(initialState);
+  let values = null;
+  if (window.SolverWasm && window.SolverWasm.isReady()) {
+    values = window.SolverWasm.solve(input);
+    if (values) values.engine = "wasm";
+  }
+  if (!values) {
+    const solver = makeSolver();
+    const initialState = {
+      attempts: input.attempts,
+      freeDiscards: input.freeDiscards,
+      doubleUses: input.doubleUses,
+      doubleActive: input.doubleActive,
+      base: addVec(input.currentCounts, input.drawnDetail),
+      drawn: input.drawnDetail,
+      total: input.currentTotal
+    };
+    values = solver.actionValues(initialState);
+    values.engine = "js";
+  }
   const summaries = Object.fromEntries(actionKeys.map(key => [key, summarizeScenarios([values[key]])]));
   const bestImmediate = Math.max(...actionKeys.map(key => summaries[key].value).filter(Number.isFinite));
   const overall = summarizeScenarios([values.best]);
@@ -261,6 +301,7 @@ function calculate() {
   status.innerHTML = `
     <div><strong>現在状態:</strong> ${input.drawnCount}枚 / 合計戦力 ${input.currentTotal} / スコア ${input.currentTotal % 11} / ${doubleText}</div>
     <div><strong>最適継続期待値:</strong> ${formatNumber(overall.value)}</div>
+    <div><strong>計算エンジン:</strong> ${engineLabel(values)}</div>
   `;
 
   const labels = {
@@ -347,3 +388,9 @@ document.querySelectorAll("input").forEach(input => {
 
 updateAutoCalculateButton();
 calculate();
+
+if (window.SolverWasm) {
+  window.SolverWasm.load().then(loaded => {
+    if (loaded && autoCalculateEnabled) calculate();
+  });
+}

@@ -184,6 +184,11 @@ button.secondary {
   color: var(--yellow);
 }
 
+button.is-off {
+  border-color: var(--danger);
+  color: #ffd0d0;
+}
+
 .draw-actions button {
   min-width: 0;
   padding-inline: 8px;
