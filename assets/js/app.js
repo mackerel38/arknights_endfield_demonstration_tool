@@ -1,9 +1,12 @@
 const REWARDS = [0, 1000, 2000, 4000, 7500, 12000, 20000, 36000, 60000, 100000, 160000];
 const POWER = [1, 2, 3, 4, 5];
 const MAX_DRAW = 5;
+const OVERFLOW_LIMIT = REWARDS.length;
+const WASM_SOLVER_COMPATIBLE = true;
 const KEY_FIELD_BITS = 16n;
 const KEY_FIELD_BASE = 1n << KEY_FIELD_BITS;
 const MAX_KEY_FIELD_VALUE = Number(KEY_FIELD_BASE - 1n);
+const DECK_COUNTS_STORAGE_KEY = "trialOfSwordmancyDeckCounts";
 const valueMemo = new Map();
 let autoCalculateEnabled = true;
 let currentLang = localStorage.getItem("language") === "en" ? "en" : "ja";
@@ -35,6 +38,8 @@ const I18N = {
     drawnPower3: "引いた戦力3",
     drawnPower4: "引いた戦力4",
     drawnPower5: "引いた戦力5",
+    preventOverflow: "オーバーフローを禁止する",
+    preventOverflowHint: "合計戦力が11以上になる引き方を不可にする",
     calculate: "計算する",
     autoOn: "自動計算: ON",
     autoOff: "自動計算: OFF",
@@ -49,6 +54,7 @@ const I18N = {
     engineLoading: "JavaScript（WASM読込中）",
     engineFailed: "JavaScript（WASM読込失敗）",
     engineNotStarted: "JavaScript（WASM未読込）",
+    engineCompatibilityFallback: "JavaScript（WASM未更新）",
     errorNumber: "数値として読めない入力があります。",
     errorCount: "回数は0以上の整数で入力してください。",
     errorLimit: "回数と山札の枚数は{limit}以下で入力してください。",
@@ -72,13 +78,15 @@ const I18N = {
     descDouble: "報酬2倍を切り替えた後、以降は最善手を選ぶ場合の期待値です。",
     descSettle: "現在のスコアで報酬を確定し、次の挑戦以降は最善手を選ぶ場合の期待値です。",
     invalidDraw: "5枚上限、または山札切れのため使用できません。",
+    invalidDrawOverflow: "5枚上限、山札切れ、またはオーバーフロー禁止のため使用できません。",
     invalidDiscard: "使用できません。",
     invalidDouble: "3枚目を引いた後、または残り回数0のため切り替えできません。",
     invalidSettle: "残り挑戦回数が0、または報酬2倍ONで残り回数0のため使用できません。",
     bestBadge: "最善",
     invalidValue: "不可",
     errorAlreadyFive: "既に5枚引いているため、これ以上反映できません。",
-    errorNoCard: "戦力{power}の山札残り枚数がありません。"
+    errorNoCard: "戦力{power}の山札残り枚数がありません。",
+    errorOverflowCard: "戦力{power}を引くとオーバーフローするため反映できません。"
   },
   en: {
     htmlLang: "en",
@@ -106,6 +114,8 @@ const I18N = {
     drawnPower3: "Drawn Power 3",
     drawnPower4: "Drawn Power 4",
     drawnPower5: "Drawn Power 5",
+    preventOverflow: "Prevent overflow",
+    preventOverflowHint: "Disallow draws that make total power 11 or higher",
     calculate: "Calculate",
     autoOn: "Auto Calculate: ON",
     autoOff: "Auto Calculate: OFF",
@@ -120,6 +130,7 @@ const I18N = {
     engineLoading: "JavaScript (loading WASM)",
     engineFailed: "JavaScript (WASM load failed)",
     engineNotStarted: "JavaScript (WASM not loaded)",
+    engineCompatibilityFallback: "JavaScript (WASM not updated)",
     errorNumber: "Some inputs could not be read as numbers.",
     errorCount: "Counts must be non-negative integers.",
     errorLimit: "Trial counts and deck counts must be {limit} or less.",
@@ -143,13 +154,15 @@ const I18N = {
     descDouble: "Expected value after toggling double reward, then playing optimally afterward.",
     descSettle: "Expected value after locking in the current score reward, then playing optimally from the next trial.",
     invalidDraw: "Unavailable because you already have 5 cards or the deck is empty.",
+    invalidDrawOverflow: "Unavailable because you already have 5 cards, the deck is empty, or overflow prevention blocks drawing.",
     invalidDiscard: "Unavailable.",
     invalidDouble: "Unavailable after the third draw or when no double reward uses remain.",
     invalidSettle: "Unavailable when no trial attempts remain, or when double reward is ON with no uses remaining.",
     bestBadge: "Best",
     invalidValue: "N/A",
     errorAlreadyFive: "You have already drawn 5 cards.",
-    errorNoCard: "No Power {power} cards remain in the deck."
+    errorNoCard: "No Power {power} cards remain in the deck.",
+    errorOverflowCard: "Drawing Power {power} would overflow, so it was not applied."
   }
 };
 
@@ -196,6 +209,30 @@ function writeInt(id, value) {
   byId(id).value = String(value);
 }
 
+function deckCountIds() {
+  return POWER.map(power => `count${power}`);
+}
+
+function loadStoredDeckCounts() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(DECK_COUNTS_STORAGE_KEY) || "null");
+    if (!Array.isArray(stored) || stored.length !== POWER.length) return;
+    stored.forEach((value, index) => {
+      if (Number.isInteger(value) && value >= 0 && value <= MAX_KEY_FIELD_VALUE) {
+        writeInt(`count${index + 1}`, value);
+      }
+    });
+  } catch {
+    localStorage.removeItem(DECK_COUNTS_STORAGE_KEY);
+  }
+}
+
+function saveDeckCounts() {
+  const counts = deckCountIds().map(id => readInt(id, 0));
+  if (!packableInts(counts)) return;
+  localStorage.setItem(DECK_COUNTS_STORAGE_KEY, JSON.stringify(counts));
+}
+
 function readInputs() {
   const currentCounts = POWER.map((_, i) => readInt(`count${i + 1}`));
   const drawnDetail = POWER.map((_, i) => readInt(`drawn${i + 1}`, 0));
@@ -207,6 +244,7 @@ function readInputs() {
     currentTotal: weightedSum(drawnDetail),
     currentCounts,
     doubleActive: byId("doubleActive").checked,
+    preventOverflow: byId("preventOverflow").checked,
     drawnDetail
   };
 }
@@ -217,6 +255,18 @@ function sum(arr) {
 
 function weightedSum(arr) {
   return arr.reduce((acc, value, index) => acc + value * POWER[index], 0);
+}
+
+function scoreOf(total) {
+  return total >= OVERFLOW_LIMIT ? 0 : total;
+}
+
+function rewardForTotal(total) {
+  return REWARDS[scoreOf(total)] ?? 0;
+}
+
+function wouldOverflow(total, power) {
+  return total + power >= OVERFLOW_LIMIT;
 }
 
 function addOne(arr, index) {
@@ -248,6 +298,7 @@ function setPendingMessage() {
 
 function engineLabel(values) {
   if (values && values.engine === "wasm") return t("engineWasm");
+  if (!WASM_SOLVER_COMPATIBLE) return t("engineCompatibilityFallback");
   if (window.SolverWasm) {
     const status = window.SolverWasm.getStatus();
     if (status === "loading") return t("engineLoading");
@@ -347,11 +398,13 @@ function applySettleAction() {
   runAutoCalculate();
 }
 
-function makeSolver() {
+function makeSolver(options = {}) {
+  const preventOverflow = Boolean(options.preventOverflow);
   const memo = valueMemo;
 
   function keyOf(state) {
     let key = 0n;
+    key = key * 2n + (preventOverflow ? 1n : 0n);
     key = appendKeyField(key, state.attempts);
     key = appendKeyField(key, state.freeDiscards);
     key = appendKeyField(key, state.doubleUses);
@@ -374,7 +427,7 @@ function makeSolver() {
     if (state.attempts <= 0) return -Infinity;
     if (state.doubleActive && state.doubleUses <= 0) return -Infinity;
     const multiplier = state.doubleActive ? 2 : 1;
-    const gained = REWARDS[((state.total % 11) + 11) % 11] * multiplier;
+    const gained = rewardForTotal(state.total) * multiplier;
     const nextState = {
       attempts: state.attempts - 1,
       freeDiscards: state.freeDiscards,
@@ -413,6 +466,9 @@ function makeSolver() {
     const deck = currentDeck(state);
     const deckTotal = sum(deck);
     if (deckTotal <= 0) return -Infinity;
+    if (preventOverflow && deck.some((count, i) => count > 0 && wouldOverflow(state.total, POWER[i]))) {
+      return -Infinity;
+    }
     let expected = 0;
     for (let i = 0; i < deck.length; i += 1) {
       if (deck[i] <= 0) continue;
@@ -515,12 +571,12 @@ function calculate() {
 
   const actionKeys = ["draw", "discard", "double", "settle"];
   let values = null;
-  if (window.SolverWasm && window.SolverWasm.isReady()) {
+  if (WASM_SOLVER_COMPATIBLE && window.SolverWasm && window.SolverWasm.isReady()) {
     values = window.SolverWasm.solve(input);
     if (values) values.engine = "wasm";
   }
   if (!values) {
-    const solver = makeSolver();
+    const solver = makeSolver({ preventOverflow: input.preventOverflow });
     const initialState = {
       attempts: input.attempts,
       freeDiscards: input.freeDiscards,
@@ -540,7 +596,7 @@ function calculate() {
     <div><strong>${t("statusCurrent", {
       drawnCount: input.drawnCount,
       total: input.currentTotal,
-      score: input.currentTotal % 11,
+      score: scoreOf(input.currentTotal),
       doubleText
     })}</strong></div>
     <div><strong>${t("statusBest", { value: formatNumber(overall.value) })}</strong></div>
@@ -561,7 +617,7 @@ function calculate() {
   };
 
   const invalidText = {
-    draw: t("invalidDraw"),
+    draw: input.preventOverflow ? t("invalidDrawOverflow") : t("invalidDraw"),
     discard: t("invalidDiscard"),
     double: t("invalidDouble"),
     settle: t("invalidSettle")
@@ -599,6 +655,10 @@ document.querySelectorAll(".draw-card").forEach(button => {
       byId("status").innerHTML = `<div class="notice error">${t("errorNoCard", { power })}</div>`;
       return;
     }
+    if (input.preventOverflow && wouldOverflow(input.currentTotal, power)) {
+      byId("status").innerHTML = `<div class="notice error">${t("errorOverflowCard", { power })}</div>`;
+      return;
+    }
     drawnInput.value = currentDrawn + 1;
     runAutoCalculate();
   });
@@ -629,13 +689,19 @@ byId("discardTrial").addEventListener("click", applyDiscardAction);
 byId("settleTrial").addEventListener("click", applySettleAction);
 
 document.querySelectorAll("input").forEach(input => {
-  input.addEventListener("change", runAutoCalculate);
+  input.addEventListener("change", () => {
+    if (deckCountIds().includes(input.id)) {
+      saveDeckCounts();
+    }
+    runAutoCalculate();
+  });
 });
 
+loadStoredDeckCounts();
 applyLanguage();
 calculate();
 
-if (window.SolverWasm) {
+if (WASM_SOLVER_COMPATIBLE && window.SolverWasm) {
   window.SolverWasm.load().then(loaded => {
     if (loaded && autoCalculateEnabled) calculate();
   });

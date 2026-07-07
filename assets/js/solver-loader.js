@@ -66,7 +66,8 @@ window.SolverWasm = (() => {
       drawn[1],
       drawn[2],
       drawn[3],
-      drawn[4]
+      drawn[4],
+      input.preventOverflow ? 1 : 0
     );
     return {
       draw: module._get_action_value(0),

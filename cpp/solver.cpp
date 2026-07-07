@@ -17,6 +17,7 @@ struct State {
   int freeDiscards;
   int doubleUses;
   int doubleActive;
+  int preventOverflow;
   int total;
   std::array<int, 5> drawn;
   std::array<int, 5> base;
@@ -26,6 +27,7 @@ struct State {
            freeDiscards == other.freeDiscards &&
            doubleUses == other.doubleUses &&
            doubleActive == other.doubleActive &&
+           preventOverflow == other.preventOverflow &&
            total == other.total &&
            drawn == other.drawn &&
            base == other.base;
@@ -43,6 +45,7 @@ struct StateHash {
     mix(state.freeDiscards);
     mix(state.doubleUses);
     mix(state.doubleActive);
+    mix(state.preventOverflow);
     mix(state.total);
     for (int value : state.drawn) mix(value);
     for (int value : state.base) mix(value);
@@ -75,7 +78,7 @@ double settleValue(const State& state) {
     return -std::numeric_limits<double>::infinity();
   }
 
-  const int score = ((state.total % 11) + 11) % 11;
+  const int score = state.total >= 11 ? 0 : state.total;
   const double gained = kRewards[score] * (state.doubleActive ? 2.0 : 1.0);
 
   State next = state;
@@ -109,6 +112,13 @@ double drawValue(const State& state) {
   const std::array<int, 5> deck = currentDeck(state);
   const int deckTotal = sumCards(deck);
   if (deckTotal <= 0) return -std::numeric_limits<double>::infinity();
+  if (state.preventOverflow) {
+    for (int i = 0; i < 5; ++i) {
+      if (deck[i] > 0 && state.total + kPower[i] >= 11) {
+        return -std::numeric_limits<double>::infinity();
+      }
+    }
+  }
 
   double expected = 0.0;
   for (int i = 0; i < 5; ++i) {
@@ -166,12 +176,14 @@ void solve(int attempts,
            int drawn2,
            int drawn3,
            int drawn4,
-           int drawn5) {
+           int drawn5,
+           int preventOverflow) {
   State state{};
   state.attempts = attempts;
   state.freeDiscards = freeDiscards;
   state.doubleUses = doubleUses;
   state.doubleActive = doubleActive ? 1 : 0;
+  state.preventOverflow = preventOverflow ? 1 : 0;
   state.drawn = {drawn1, drawn2, drawn3, drawn4, drawn5};
   state.base = {count1, count2, count3, count4, count5};
   state.total = drawn1 + drawn2 * 2 + drawn3 * 3 + drawn4 * 4 + drawn5 * 5;
@@ -183,6 +195,7 @@ void solve(int attempts,
                                         state.freeDiscards,
                                         state.doubleUses,
                                         state.doubleActive ? 0 : 1,
+                                        state.preventOverflow,
                                         state.total,
                                         state.drawn,
                                         state.base})
