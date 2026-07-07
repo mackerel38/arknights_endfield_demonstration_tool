@@ -78,7 +78,7 @@ double settleValue(const State& state) {
     return -std::numeric_limits<double>::infinity();
   }
 
-  const int score = state.total >= 11 ? 0 : state.total;
+  const int score = ((state.total % 11) + 11) % 11;
   const double gained = kRewards[score] * (state.doubleActive ? 2.0 : 1.0);
 
   State next = state;

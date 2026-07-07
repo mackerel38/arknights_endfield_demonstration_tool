@@ -258,7 +258,7 @@ function weightedSum(arr) {
 }
 
 function scoreOf(total) {
-  return total >= OVERFLOW_LIMIT ? 0 : total;
+  return ((total % OVERFLOW_LIMIT) + OVERFLOW_LIMIT) % OVERFLOW_LIMIT;
 }
 
 function rewardForTotal(total) {
