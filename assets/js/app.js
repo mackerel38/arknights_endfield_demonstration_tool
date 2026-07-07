@@ -38,7 +38,6 @@ const I18N = {
     calculate: "計算する",
     autoOn: "自動計算: ON",
     autoOff: "自動計算: OFF",
-    clear: "クリア",
     resultTitle: "各ボタンの期待値",
     complexityTitle: "計算量",
     complexityText: "このツールは、動的計画法を用いてできるだけ高速化していますが、結構重いです（；；）改善できる方はご連絡ください！",
@@ -110,7 +109,6 @@ const I18N = {
     calculate: "Calculate",
     autoOn: "Auto Calculate: ON",
     autoOff: "Auto Calculate: OFF",
-    clear: "Clear",
     resultTitle: "Expected Value by Action",
     complexityTitle: "Runtime",
     complexityText: "This tool uses dynamic programming to run as fast as possible, but it can still be fairly heavy. Please contact me if you can improve it!",
@@ -155,12 +153,6 @@ const I18N = {
   }
 };
 
-const ids = [
-  "attempts", "freeDiscards", "doubleUses",
-  "count1", "count2", "count3", "count4", "count5",
-  "drawn1", "drawn2", "drawn3", "drawn4", "drawn5"
-];
-
 function byId(id) {
   return document.getElementById(id);
 }
@@ -198,6 +190,10 @@ function readInt(id, fallback = 0) {
   if (raw === "") return fallback;
   const value = Number(raw);
   return Number.isFinite(value) ? Math.trunc(value) : NaN;
+}
+
+function writeInt(id, value) {
+  byId(id).value = String(value);
 }
 
 function readInputs() {
@@ -299,6 +295,56 @@ function validateInputs(input) {
   }
   if (!nonNegativeInts(input.drawnDetail)) errors.push(t("errorDrawn"));
   return errors;
+}
+
+function showErrors(errors) {
+  byId("status").innerHTML = errors.map(error => `<div class="notice error">${error}</div>`).join("");
+}
+
+function resetCurrentTrialInputs() {
+  POWER.forEach(power => {
+    writeInt(`drawn${power}`, 0);
+  });
+  byId("doubleActive").checked = false;
+}
+
+function applyDiscardAction() {
+  const input = readInputs();
+  const errors = validateInputs(input);
+  if (errors.length > 0) {
+    showErrors(errors);
+    return;
+  }
+
+  if (input.freeDiscards > 0) {
+    writeInt("freeDiscards", input.freeDiscards - 1);
+  } else if (input.attempts > 0) {
+    writeInt("attempts", input.attempts - 1);
+  } else {
+    showErrors([t("invalidDiscard")]);
+    return;
+  }
+
+  resetCurrentTrialInputs();
+  runAutoCalculate();
+}
+
+function applySettleAction() {
+  const input = readInputs();
+  const errors = validateInputs(input);
+  if (errors.length > 0) {
+    showErrors(errors);
+    return;
+  }
+  if (input.attempts <= 0 || (input.doubleActive && input.doubleUses <= 0)) {
+    showErrors([t("invalidSettle")]);
+    return;
+  }
+
+  writeInt("attempts", input.attempts - 1);
+  writeInt("doubleUses", input.doubleUses - (input.doubleActive ? 1 : 0));
+  resetCurrentTrialInputs();
+  runAutoCalculate();
 }
 
 function makeSolver() {
@@ -432,6 +478,28 @@ function summarizeScenarios(values) {
   };
 }
 
+function shouldShowBestBadge(key, item, summaries, input) {
+  if (!Number.isFinite(item.value)) return false;
+  const tolerance = 1e-7;
+  const bestImmediate = Math.max(
+    ...Object.values(summaries)
+      .map(summary => summary.value)
+      .filter(Number.isFinite)
+  );
+  if (Math.abs(item.value - bestImmediate) >= tolerance) return false;
+
+  if (key !== "double") return true;
+  if (input.drawnCount <= 1) return false;
+
+  const otherBest = Math.max(
+    ...Object.entries(summaries)
+      .filter(([actionKey]) => actionKey !== "double")
+      .map(([, summary]) => summary.value)
+      .filter(Number.isFinite)
+  );
+  return item.value - otherBest > tolerance;
+}
+
 function calculate() {
   const input = readInputs();
   const status = byId("status");
@@ -441,7 +509,7 @@ function calculate() {
 
   const errors = validateInputs(input);
   if (errors.length > 0) {
-    status.innerHTML = errors.map(error => `<div class="notice error">${error}</div>`).join("");
+    showErrors(errors);
     return;
   }
 
@@ -466,7 +534,6 @@ function calculate() {
     values.engine = "js";
   }
   const summaries = Object.fromEntries(actionKeys.map(key => [key, summarizeScenarios([values[key]])]));
-  const bestImmediate = Math.max(...actionKeys.map(key => summaries[key].value).filter(Number.isFinite));
   const overall = summarizeScenarios([values.best]);
   const doubleText = input.doubleActive ? t("doubleOn") : t("doubleOff");
   status.innerHTML = `
@@ -503,7 +570,7 @@ function calculate() {
   results.innerHTML = actionKeys.map(key => {
     const item = summaries[key];
     const valid = Number.isFinite(item.value);
-    const isBest = valid && Math.abs(item.value - bestImmediate) < 1e-7;
+    const isBest = shouldShowBestBadge(key, item, summaries, input);
     return `
       <article class="result ${isBest ? "best" : ""} ${valid ? "" : "invalid"}">
         <div class="result-head">
@@ -558,13 +625,8 @@ byId("autoCalculate").addEventListener("click", () => {
   }
 });
 
-byId("clear").addEventListener("click", () => {
-  ids.forEach(id => {
-    byId(id).value = "";
-  });
-  byId("doubleActive").checked = false;
-  runAutoCalculate();
-});
+byId("discardTrial").addEventListener("click", applyDiscardAction);
+byId("settleTrial").addEventListener("click", applySettleAction);
 
 document.querySelectorAll("input").forEach(input => {
   input.addEventListener("change", runAutoCalculate);
