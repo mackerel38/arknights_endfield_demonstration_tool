@@ -20,13 +20,13 @@ const I18N = {
     doubleUses: "残り報酬2倍回数",
     doubleActive: "現在、報酬2倍がON",
     doubleActiveHint: "ONとして演算開始を評価",
-    deckCounts: "山札の残り枚数",
+    deckCounts: "山札の初期枚数",
     power1: "戦力1",
     power2: "戦力2",
     power3: "戦力3",
     power4: "戦力4",
     power5: "戦力5",
-    deckHint: "ここは、現在の挑戦で既に引いたカードを除いた山札枚数として入力します。",
+    deckHint: "各挑戦開始時の山札枚数を入力します。現在引いたカードは下の内訳で指定します。",
     drawActionsLabel: "引いたカードを反映",
     drewPower: "戦力{power}を引いた",
     drawnBreakdown: "精密入力: 現在引いたカードの内訳",
@@ -53,8 +53,8 @@ const I18N = {
     errorNumber: "数値として読めない入力があります。",
     errorCount: "回数は0以上の整数で入力してください。",
     errorLimit: "回数と山札の枚数は{limit}以下で入力してください。",
-    errorBaseLimit: "挑戦開始時の山札枚数は各戦力{limit}枚以下にしてください。",
-    errorDeck: "山札の残り枚数は0以上の整数で入力してください。",
+    errorDeck: "山札の初期枚数は0以上の整数で入力してください。",
+    errorDrawnOverDeck: "現在引いたカードの枚数は、山札の初期枚数以下にしてください。",
     errorDrawnMax: "現在引いている枚数は5枚以下です。",
     errorDoubleActive: "報酬2倍ONの盤面では、残り報酬2倍回数が1以上必要です。",
     errorDrawn: "現在引いたカードの内訳は0以上の整数で入力してください。",
@@ -92,13 +92,13 @@ const I18N = {
     doubleUses: "Remaining double-reward uses",
     doubleActive: "Double reward is currently ON",
     doubleActiveHint: "Evaluate Start Calculation with double reward ON",
-    deckCounts: "Remaining deck cards",
+    deckCounts: "Initial deck cards",
     power1: "Power 1",
     power2: "Power 2",
     power3: "Power 3",
     power4: "Power 4",
     power5: "Power 5",
-    deckHint: "Enter the remaining deck after excluding cards already drawn in the current trial.",
+    deckHint: "Enter the starting deck count for each trial. Specify currently drawn cards below.",
     drawActionsLabel: "Apply drawn card",
     drewPower: "Drew Power {power}",
     drawnBreakdown: "Precise Input: Cards Drawn This Trial",
@@ -125,8 +125,8 @@ const I18N = {
     errorNumber: "Some inputs could not be read as numbers.",
     errorCount: "Counts must be non-negative integers.",
     errorLimit: "Trial counts and deck counts must be {limit} or less.",
-    errorBaseLimit: "Starting deck count for each power must be {limit} or less.",
-    errorDeck: "Remaining deck cards must be non-negative integers.",
+    errorDeck: "Initial deck cards must be non-negative integers.",
+    errorDrawnOverDeck: "Drawn card counts must not exceed the initial deck counts.",
     errorDrawnMax: "You can draw at most 5 cards.",
     errorDoubleActive: "If double reward is ON, remaining double reward uses must be at least 1.",
     errorDrawn: "Drawn card counts must be non-negative integers.",
@@ -223,10 +223,6 @@ function weightedSum(arr) {
   return arr.reduce((acc, value, index) => acc + value * POWER[index], 0);
 }
 
-function addVec(a, b) {
-  return a.map((v, i) => v + b[i]);
-}
-
 function addOne(arr, index) {
   const next = arr.slice();
   next[index] += 1;
@@ -293,10 +289,10 @@ function validateInputs(input) {
   if (!packableInts([input.attempts, input.freeDiscards, input.doubleUses, ...input.currentCounts])) {
     errors.push(t("errorLimit", { limit: MAX_KEY_FIELD_VALUE }));
   }
-  if (!input.currentCounts.every((count, i) => count + input.drawnDetail[i] <= MAX_KEY_FIELD_VALUE)) {
-    errors.push(t("errorBaseLimit", { limit: MAX_KEY_FIELD_VALUE }));
-  }
   if (!nonNegativeInts(input.currentCounts)) errors.push(t("errorDeck"));
+  if (!input.drawnDetail.every((count, i) => count <= input.currentCounts[i])) {
+    errors.push(t("errorDrawnOverDeck"));
+  }
   if (input.drawnCount > MAX_DRAW) errors.push(t("errorDrawnMax"));
   if (input.doubleActive && input.doubleUses <= 0) {
     errors.push(t("errorDoubleActive"));
@@ -331,7 +327,6 @@ function makeSolver() {
   function settleValue(state) {
     if (state.attempts <= 0) return -Infinity;
     if (state.doubleActive && state.doubleUses <= 0) return -Infinity;
-    const deck = currentDeck(state);
     const multiplier = state.doubleActive ? 2 : 1;
     const gained = REWARDS[((state.total % 11) + 11) % 11] * multiplier;
     const nextState = {
@@ -339,7 +334,7 @@ function makeSolver() {
       freeDiscards: state.freeDiscards,
       doubleUses: state.doubleUses - (state.doubleActive ? 1 : 0),
       doubleActive: false,
-      base: deck,
+      base: state.base,
       drawn: [0, 0, 0, 0, 0],
       total: 0
     };
@@ -463,7 +458,7 @@ function calculate() {
       freeDiscards: input.freeDiscards,
       doubleUses: input.doubleUses,
       doubleActive: input.doubleActive,
-      base: addVec(input.currentCounts, input.drawnDetail),
+      base: input.currentCounts,
       drawn: input.drawnDetail,
       total: input.currentTotal
     };
@@ -525,20 +520,19 @@ function calculate() {
 document.querySelectorAll(".draw-card").forEach(button => {
   button.addEventListener("click", () => {
     const power = Number(button.dataset.power);
-    const countInput = byId(`count${power}`);
     const drawnInput = byId(`drawn${power}`);
-    const currentCount = readInt(`count${power}`, 0);
+    const initialCount = readInt(`count${power}`, 0);
+    const currentDrawn = readInt(`drawn${power}`, 0);
     const input = readInputs();
     if (input.drawnCount >= MAX_DRAW) {
       byId("status").innerHTML = `<div class="notice error">${t("errorAlreadyFive")}</div>`;
       return;
     }
-    if (currentCount <= 0) {
+    if (currentDrawn >= initialCount) {
       byId("status").innerHTML = `<div class="notice error">${t("errorNoCard", { power })}</div>`;
       return;
     }
-    countInput.value = currentCount - 1;
-    drawnInput.value = readInt(`drawn${power}`, 0) + 1;
+    drawnInput.value = currentDrawn + 1;
     runAutoCalculate();
   });
 });

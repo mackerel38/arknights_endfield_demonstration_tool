@@ -75,7 +75,6 @@ double settleValue(const State& state) {
     return -std::numeric_limits<double>::infinity();
   }
 
-  const std::array<int, 5> deck = currentDeck(state);
   const int score = ((state.total % 11) + 11) % 11;
   const double gained = kRewards[score] * (state.doubleActive ? 2.0 : 1.0);
 
@@ -83,7 +82,6 @@ double settleValue(const State& state) {
   next.attempts -= 1;
   next.doubleUses -= state.doubleActive ? 1 : 0;
   next.doubleActive = 0;
-  next.base = deck;
   next.drawn = {0, 0, 0, 0, 0};
   next.total = 0;
   return gained + bestValue(next);
@@ -175,12 +173,7 @@ void solve(int attempts,
   state.doubleUses = doubleUses;
   state.doubleActive = doubleActive ? 1 : 0;
   state.drawn = {drawn1, drawn2, drawn3, drawn4, drawn5};
-  state.base = {
-      count1 + drawn1,
-      count2 + drawn2,
-      count3 + drawn3,
-      count4 + drawn4,
-      count5 + drawn5};
+  state.base = {count1, count2, count3, count4, count5};
   state.total = drawn1 + drawn2 * 2 + drawn3 * 3 + drawn4 * 4 + drawn5 * 5;
 
   lastValues[0] = drawValue(state);
